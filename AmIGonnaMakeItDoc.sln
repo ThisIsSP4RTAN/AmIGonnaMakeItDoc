@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36401.2 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RW.AmIGonnaMakeItDoc", "RW.AmIGonnaMakeItDoc\RW.AmIGonnaMakeItDoc.csproj", "{63A55C72-432C-4D61-ADE9-333740701DCE}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{63A55C72-432C-4D61-ADE9-333740701DCE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{63A55C72-432C-4D61-ADE9-333740701DCE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{63A55C72-432C-4D61-ADE9-333740701DCE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{63A55C72-432C-4D61-ADE9-333740701DCE}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {C8B2AD83-1207-45F5-BBC4-0234ECC63C23}
+	EndGlobalSection
+EndGlobal
