@@ -13,14 +13,8 @@ namespace AmIGonnaMakeItDoc
     {
         static Prognosis_Bootstrap()
         {
-            try
-            {
-                new Harmony("net.S4.amigonnamakeitdoc").PatchAll();
-            }
-            catch
-            {
-                // silent
-            }
+            try { new Harmony("net.S4.amigonnamakeitdoc").PatchAll(); }
+            catch { /* silent */ }
         }
     }
 
@@ -34,7 +28,6 @@ namespace AmIGonnaMakeItDoc
                 return s != null ? Mathf.Clamp(s.requiredMedicineLevel, 0, 20) : 8;
             }
         }
-
         private static bool GateEnabled
         {
             get
@@ -44,27 +37,28 @@ namespace AmIGonnaMakeItDoc
             }
         }
 
-        private static readonly System.Collections.Generic.Dictionary<Pawn, int> lastDoctorSkill =
-            new System.Collections.Generic.Dictionary<Pawn, int>();
-
-        public static void RecordDoctorSkill(Pawn patient, int level)
+        public static void RecordDoctorSkillForAllDiseases(Pawn patient, int level)
         {
-            if (patient == null) return;
-            lastDoctorSkill[patient] = level;
+            PrognosisDoctorMemory.RecordForAllImmunizableOn(patient, level);
         }
 
-        public static bool Meets(Pawn patient)
+        // Gate is now per disease
+        public static bool Meets(Pawn patient, HediffDef def)
         {
             if (!GateEnabled) return true;
-            if (patient == null || patient.Dead) return false;
-            int lvl;
-            if (!lastDoctorSkill.TryGetValue(patient, out lvl)) return false;
+            if (patient == null || patient.Dead || def == null) return false;
+
+            int lvl, tick;
+            if (!PrognosisDoctorMemory.TryGet(patient, def, out lvl, out tick)) return false;
             return lvl >= RequiredMedicineLevel;
         }
     }
 
+    // Primary hook: derived tend driver cleanup
     [HarmonyPatch]
-    internal static class Prognosis_Tend_Cleanup_Memorize
+    [HarmonyBefore("net.S4.undraftaftertend.safehooks", "net.S4.undraftafterrepair")]
+    [HarmonyPriority(Priority.Last)]
+    internal static class Prognosis_Tend_Cleanup_Memorize_Derived
     {
         [HarmonyPrepare]
         public static bool Prepare()
@@ -86,10 +80,7 @@ namespace AmIGonnaMakeItDoc
                 if (condition != JobCondition.Succeeded || __instance == null) return;
 
                 Pawn doctor = __instance.pawn;
-                Pawn patient = __instance.job != null
-                    ? (__instance.job.GetTarget(TargetIndex.A).Thing as Pawn)
-                    : null;
-
+                Pawn patient = __instance.job != null ? (__instance.job.GetTarget(TargetIndex.A).Thing as Pawn) : null;
                 if (doctor == null || patient == null) return;
 
                 int level = 0;
@@ -98,16 +89,44 @@ namespace AmIGonnaMakeItDoc
                     var med = doctor.skills.GetSkill(SkillDefOf.Medicine);
                     if (med != null) level = med.Level;
                 }
-
-                Prognosis_DoctorGate.RecordDoctorSkill(patient, level);
+                Prognosis_DoctorGate.RecordDoctorSkillForAllDiseases(patient, level);
             }
-            catch
-            {
-                // silent
-            }
+            catch { /* silent */ }
         }
     }
 
+    // Fallback: base cleanup (covers edge paths)
+    [HarmonyPatch(typeof(JobDriver), nameof(JobDriver.Cleanup))]
+    [HarmonyBefore("net.S4.undraftaftertend.safehooks", "net.S4.undraftafterrepair")]
+    [HarmonyPriority(Priority.Last)]
+    internal static class Prognosis_Tend_Cleanup_Memorize_Base
+    {
+        [HarmonyPostfix]
+        public static void Postfix(JobDriver __instance, JobCondition condition)
+        {
+            try
+            {
+                if (condition != JobCondition.Succeeded) return;
+                if (__instance == null || __instance.job == null) return;
+                if (__instance.job.def != JobDefOf.TendPatient) return;
+
+                Pawn doctor = __instance.pawn;
+                Pawn patient = __instance.job.GetTarget(TargetIndex.A).Thing as Pawn;
+                if (doctor == null || patient == null) return;
+
+                int level = 0;
+                if (doctor.skills != null)
+                {
+                    var med = doctor.skills.GetSkill(SkillDefOf.Medicine);
+                    if (med != null) level = med.Level;
+                }
+                Prognosis_DoctorGate.RecordDoctorSkillForAllDiseases(patient, level);
+            }
+            catch { /* silent */ }
+        }
+    }
+
+    // Tooltip verdict (uses per-disease gate)
     [HarmonyPatch]
     public static class Prognosis_TooltipPatch
     {
@@ -134,8 +153,8 @@ namespace AmIGonnaMakeItDoc
                 var def = __instance.Def;
                 if (pawn == null || def == null) return;
 
-                // Doctor gate: only show the prognosis if a sufficiently skilled doctor tended this pawn
-                if (!Prognosis_DoctorGate.Meets(pawn)) return;
+                // require a record for THIS disease
+                if (!Prognosis_DoctorGate.Meets(pawn, def)) return;
 
                 var handler = pawn.health != null ? pawn.health.immunity : null;
                 if (handler == null) return;
@@ -145,7 +164,7 @@ namespace AmIGonnaMakeItDoc
                 if (rec == null) return;
 
                 float curImm = rec.immunity;
-                if (curImm >= 1f) return; // fully immune, no prognosis needed
+                if (curImm >= 1f) return; // fully immune -> no line
 
                 float immPerDay = rec.ImmunityChangePerTick(pawn, true, __instance.parent) * 60000f;
                 float sevPerDay = __instance.SeverityChangePerDay();
@@ -155,10 +174,7 @@ namespace AmIGonnaMakeItDoc
                 if (!string.IsNullOrEmpty(verdict))
                     Append(ref __result, "Prognosis: " + verdict);
             }
-            catch
-            {
-                // silent
-            }
+            catch { /* silent */ }
         }
 
         private static void Append(ref string s, string line)
