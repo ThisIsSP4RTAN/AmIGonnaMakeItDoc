@@ -18,7 +18,8 @@
   <li>brrainz.harmony</li>
 </loadAfter>
 <loadBefore>
-
+  <li>s4.undraftafterrepairing</li>
+  <li>s4.undraftaftertending</li>
 </loadBefore>
 <description>Provides a prognosis for pawns with immunizable diseases.
 
